@@ -1,8 +1,13 @@
-import styles from './Make.module.scss'
-import { getIPFSURL } from '../common/ipfs'
-import { useRef } from 'react'
-import { useState } from 'react'
 import classNames from 'classnames'
+import * as htmlToImage from 'html-to-image'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import TRC721ExtendableRoyaltyABI from '../abi/TRC721ExtendableRoyalty.json'
+import { getIPFSURL, getIPFSMetadataJSON } from '../common/ipfs'
+import { dataURLtoFile } from '../common/utils'
+import { useTron } from '../contexts/Tron'
+import nftStorage from '../common/nft-storage'
+import styles from './Make.module.scss'
 
 const HeadNFTs = [
   {
@@ -77,11 +82,152 @@ const ShoesNFTs = [
 ]
 
 export default () => {
+  const { account } = useTron()
+
+  const navigate = useNavigate()
   const outputRef = useRef(null)
+
   const [head, setHead] = useState()
   const [jacket, setJacket] = useState()
   const [pants, setPants] = useState()
   const [shoes, setShoes] = useState()
+  const [royaltyData, setRoyaltyData] = useState()
+  const [royaltyTRX, setRoyaltyTRX] = useState('')
+  const [minting, setMinting] = useState(false)
+
+  useEffect(() => {
+    if (head) {
+      const instance = window.tronWeb.contract(
+        TRC721ExtendableRoyaltyABI.abi,
+        '416424f925935e901245735d613e9c4ca3c3669386',
+      )
+
+      instance
+        .royaltiesOf(head.tokenId)
+        .call()
+        .then(res => {
+          setRoyaltyData(royaltyData => ({
+            ...royaltyData,
+            Head: {
+              tokenAddress: head.tokenAddress,
+              tokenId: head.tokenId,
+              royaltyValue: res[0][1].toNumber() / 1e6,
+            },
+          }))
+        })
+    }
+  }, [head])
+
+  useEffect(() => {
+    if (jacket) {
+      const instance = window.tronWeb.contract(
+        TRC721ExtendableRoyaltyABI.abi,
+        '416424f925935e901245735d613e9c4ca3c3669386',
+      )
+
+      instance
+        .royaltiesOf(jacket.tokenId)
+        .call()
+        .then(res => {
+          setRoyaltyData(royaltyData => ({
+            ...royaltyData,
+            Jacket: {
+              tokenAddress: jacket.tokenAddress,
+              tokenId: jacket.tokenId,
+              royaltyValue: res[0][1].toNumber() / 1e6,
+            },
+          }))
+        })
+    }
+  }, [jacket])
+
+  useEffect(() => {
+    if (pants) {
+      const instance = window.tronWeb.contract(
+        TRC721ExtendableRoyaltyABI.abi,
+        '416424f925935e901245735d613e9c4ca3c3669386',
+      )
+      instance
+        .royaltiesOf(pants.tokenId)
+        .call()
+        .then(res => {
+          setRoyaltyData(royaltyData => ({
+            ...royaltyData,
+            Pants: {
+              tokenAddress: pants.tokenAddress,
+              tokenId: pants.tokenId,
+              royaltyValue: res[0][1].toNumber() / 1e6,
+            },
+          }))
+        })
+    }
+  }, [pants])
+
+  useEffect(() => {
+    if (shoes) {
+      const instance = window.tronWeb.contract(
+        TRC721ExtendableRoyaltyABI.abi,
+        '416424f925935e901245735d613e9c4ca3c3669386',
+      )
+
+      instance
+        .royaltiesOf(shoes.tokenId)
+        .call()
+        .then(res => {
+          setRoyaltyData(royaltyData => ({
+            ...royaltyData,
+            Shoes: {
+              tokenAddress: shoes.tokenAddress,
+              tokenId: shoes.tokenId,
+              royaltyValue: res[0][1].toNumber() / 1e6,
+            },
+          }))
+        })
+    }
+  }, [shoes])
+
+  const mint = async () => {
+    const royaltyValue = Number(royaltyTRX || 0) * 1e6
+
+    const dataURL = await htmlToImage.toPng(outputRef.current)
+    const file = dataURLtoFile(dataURL, `crafted.png`)
+
+    const { url: tokenURI } = await nftStorage.store({
+      name: 'Crafted by NFTBlocks Demo',
+      description: `Based on ${Object.values(royaltyData).map(
+        data => `${data.tokenAddress}#${data.tokenId}`,
+      )}`,
+      image: file,
+    })
+
+    console.log(tokenURI)
+    console.log(await getIPFSMetadataJSON(tokenURI))
+
+    const instance = window.tronWeb.contract(
+      TRC721ExtendableRoyaltyABI.abi,
+      '416424f925935e901245735d613e9c4ca3c3669386',
+    )
+
+    const res = await instance
+      .mint(
+        account.address,
+        tokenURI,
+        royaltyValue,
+        Object.values(royaltyData).map(data => [
+          instance.address,
+          data.tokenId,
+        ]),
+      )
+      .send({
+        feeLimit: 1e9,
+        shouldPollResponse: true,
+      })
+
+    console.log(res)
+    console.log(res.toNumber())
+
+    navigate(`/view/${instance.address}/${res.toNumber()}`)
+  }
 
   return (
     <div className={styles.page}>
@@ -169,6 +315,51 @@ export default () => {
               src={getIPFSURL(shoes.tokenImageURI)}
             />
           )}
+        </div>
+        {royaltyData && (
+          <div className={styles.royalties}>
+            <h3>Royalties</h3>
+            <ul>
+              {Object.entries(royaltyData).map(([name, data]) => (
+                <li key={name}>
+                  {name}: {data.tokenAddress.slice(0, 18)}... #{data.tokenId},{' '}
+                  {data.royaltyValue} TRX
+                </li>
+              ))}
+            </ul>
+            <p>
+              <b>
+                Total royalty:{' '}
+                {Object.values(royaltyData).reduce((prev, curr) => {
+                  prev += curr.royaltyValue
+                  return prev
+                }, 0)}{' '}
+                TRX
+              </b>
+            </p>
+          </div>
+        )}
+        <div className={styles.controls}>
+          <input
+            className={styles.royaltyInput}
+            placeholder="Royalty Value (in TRX)"
+            value={royaltyTRX}
+            onChange={event => setRoyaltyTRX(event.target.value)}
+          />
+          <div
+            className={classNames(styles.mint, minting && styles.disabled)}
+            onClick={() => {
+              setMinting(true)
+              mint()
+                .then(() => setMinting(false))
+                .catch(err => {
+                  console.error(err)
+                  setMinting(false)
+                })
+            }}
+          >
+            {minting ? 'Minting ...' : 'Mint'}
+          </div>
         </div>
       </div>
     </div>
