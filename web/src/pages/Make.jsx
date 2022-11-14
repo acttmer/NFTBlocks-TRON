@@ -208,7 +208,14 @@ export default () => {
       '416424f925935e901245735d613e9c4ca3c3669386',
     )
 
-    const res = await instance
+    const totalSupply = await instance.totalSupply().call()
+
+    // It's a workaround, since tronweb usually cannot get the result in time
+    setTimeout(() => {
+      navigate(`/view/${instance.address}/${totalSupply.toNumber() + 1}`)
+    }, 15000)
+
+    await instance
       .mint(
         account.address,
         tokenURI,
@@ -222,11 +229,6 @@ export default () => {
         feeLimit: 1e9,
         shouldPollResponse: true,
       })
-
-    console.log(res)
-    console.log(res.toNumber())
-
-    navigate(`/view/${instance.address}/${res.toNumber()}`)
   }
 
   return (
