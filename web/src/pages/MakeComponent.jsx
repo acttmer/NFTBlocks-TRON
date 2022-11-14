@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import TRC721ExtendableRoyaltyABI from '../abi/TRC721ExtendableRoyalty.json'
+import { getIPFSMetadataJSON } from '../common/ipfs'
 import nftStorage from '../common/nft-storage'
 import tronWeb from '../common/tronweb'
 import { useTron } from '../contexts/Tron'
@@ -62,12 +63,13 @@ export default () => {
     const royaltyValue = Number(royaltyTRX) * 1e6
 
     const { url: tokenURI } = await nftStorage.store({
-      name,
-      description: `NFT Collection with name "${name}" and symbol "${symbol}"`,
+      name: 'NFTBlocks Demo Component',
+      description: `NFTBlocks Demo Component`,
       image: file,
     })
 
     console.log(tokenURI)
+    console.log(await getIPFSMetadataJSON(tokenURI))
 
     const res = await instance
       .mint(account.address, tokenURI, royaltyValue, [])
