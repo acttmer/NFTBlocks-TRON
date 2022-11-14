@@ -23,7 +23,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.4.2",
-    "tronweb": "^4.4.0"
+    "tronweb": "^3.2.6"
   },
   "alias": {
     "nft.storage": "nft.storage/dist/bundle.esm.min.js",

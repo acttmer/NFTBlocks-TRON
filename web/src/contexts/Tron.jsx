@@ -11,18 +11,20 @@ export const TronProvider = ({ children }) => {
   const value = { account }
 
   useEffect(() => {
-    const interval = setInterval(async () => {
-      if (window.tronWeb && window.tronWeb.ready) {
-        window.tronWeb.trx
-          .getAccount(window.tronWeb.defaultAddress.base58)
-          .then(setAccount)
-      }
-    }, 2000)
+    if (!account) {
+      const interval = setInterval(async () => {
+        if (window.tronWeb && window.tronWeb.ready) {
+          window.tronWeb.trx
+            .getAccount(window.tronWeb.defaultAddress.base58)
+            .then(setAccount)
+        }
+      }, 2000)
 
-    return () => {
-      clearInterval(interval)
+      return () => {
+        clearInterval(interval)
+      }
     }
-  })
+  }, [account])
 
   return <context.Provider value={value}>{children}</context.Provider>
 }
